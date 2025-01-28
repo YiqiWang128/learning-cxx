@@ -1,7 +1,9 @@
 ﻿#include "../exercise.h"
+#include <cstring>
 
 // READ: 类模板 <https://zh.cppreference.com/w/cpp/language/class_template>
 
+/*
 template<class T>
 struct Tensor4D {
     unsigned int shape[4];
@@ -31,6 +33,72 @@ struct Tensor4D {
         return *this;
     }
 };
+*/
+
+template<class T>
+struct Tensor4D {
+    unsigned int shape[4];
+    T *data;
+
+    Tensor4D(unsigned int const shape_[4], T const *data_) {
+        // TODO: 填入正确的 shape 并计算 size
+        for (int i = 0; i < 4; ++i) {
+            shape[i] = shape_[i];
+        }
+        unsigned int size = shape[0] * shape[1] * shape[2] * shape[3];
+        data = new T[size];
+        std::memcpy(data, data_, size * sizeof(T));
+    }
+    ~Tensor4D() {
+        delete[] data;
+    }
+
+    // 为了保持简单，禁止复制和移动
+    Tensor4D(Tensor4D const &) = delete;
+    Tensor4D(Tensor4D &&) noexcept = delete;
+
+    // 这个加法需要支持“单向广播”。
+    // 具体来说，`others` 可以具有与 `this` 不同的形状，形状不同的维度长度必须为 1。
+    // `others` 长度为 1 但 `this` 长度不为 1 的维度将发生广播计算。
+    // 例如，`this` 形状为 `[1, 2, 3, 4]`，`others` 形状为 `[1, 2, 1, 4]`，
+    // 则 `this` 与 `others` 相加时，3 个形状为 `[1, 2, 1, 4]` 的子张量各自与 `others` 对应项相加。
+    Tensor4D &operator+=(Tensor4D const &others) {
+        const unsigned int s1 = others.shape[1];
+        const unsigned int s2 = others.shape[2];
+        const unsigned int s3 = others.shape[3];
+        const unsigned int stride1 = s1 * s2 * s3;
+        const unsigned int stride2 = s2 * s3;
+        const unsigned int stride3 = s3;
+
+        for (unsigned int i0 = 0; i0 < shape[0]; ++i0) {
+            for (unsigned int i1 = 0; i1 < shape[1]; ++i1) {
+                for (unsigned int i2 = 0; i2 < shape[2]; ++i2) {
+                    for (unsigned int i3 = 0; i3 < shape[3]; ++i3) {
+                        unsigned int this_idx = i0 * (shape[1] * shape[2] * shape[3])
+                                              + i1 * (shape[2] * shape[3])
+                                              + i2 * shape[3]
+                                              + i3;
+
+                        unsigned int j0 = (others.shape[0] == 1) ? 0 : i0;
+                        unsigned int j1 = (others.shape[1] == 1) ? 0 : i1;
+                        unsigned int j2 = (others.shape[2] == 1) ? 0 : i2;
+                        unsigned int j3 = (others.shape[3] == 1) ? 0 : i3;
+
+                        unsigned int others_idx = j0 * stride1
+                                                + j1 * stride2
+                                                + j2 * stride3
+                                                + j3;
+
+                        data[this_idx] += others.data[others_idx];
+                    }
+                }
+            }
+        }
+        return *this;
+    }
+};
+
+
 
 // ---- 不要修改以下代码 ----
 int main(int argc, char **argv) {
